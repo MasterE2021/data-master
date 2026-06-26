@@ -23,5 +23,13 @@ npm run tauri dev
 # 最终发布应用
 npm run tauri build
 
+
+# 日常开发 (一键搞定)
+npm run tauri dev
+
+# 准备发布 (上线打包)：
+npm run build:python  # 第一步：把最终代码打包成 exe (放进 bin 目录)
+npm run tauri build   # 第二步：Tauri 自动将其合成为一个最终版程序
+
 ```
 
