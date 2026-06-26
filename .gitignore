@@ -24,4 +24,9 @@ dist-ssr
 *.sw?
 
 src-tauri/Cargo.lock
+src-tauri/bin
+
 package-lock.json
+
+build
+server-x86_64-pc-windows-msvc.spec
