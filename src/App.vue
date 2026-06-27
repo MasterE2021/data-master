@@ -7,13 +7,20 @@
           <el-button type="primary" :icon="FolderOpened" class="tool-btn" @click="switchTo('file')"/>
           <el-button type="warning" :icon="List" class="tool-btn" @click="switchTo('todo')"/>
           <div class="toolbar-spacer"></div>
-          <el-button type="success" :icon="Upload" class="tool-btn" @click="handleImport"/>
+
+          <!-- 导出按钮（仅示意，可绑定功能） -->
+          <el-button type="success" :icon="Download" class="tool-btn" @click="handleExport"/>
+
+          <!-- 新增导入按钮 -->
+          <el-button type="success" :icon="FolderAdd" class="tool-btn" @click="handleImport"/>
         </div>
       </el-aside>
 
-      <!-- 主工作区：动态加载视图 -->
+      <!-- 主工作区 -->
       <el-main class="main-content">
-        <component :is="currentView"/>
+        <!-- 文件视图需要传入文件树 -->
+        <FilePage v-if="currentViewKey === 'file'" :tree="fileTree"/>
+        <TodoPage v-else-if="currentViewKey === 'todo'"/>
       </el-main>
     </el-container>
 
@@ -28,24 +35,82 @@
 
 <script setup>
 import {ref} from 'vue';
-import {FolderOpened, List, Upload} from '@element-plus/icons-vue';
+import {FolderOpened, List, Download, FolderAdd} from '@element-plus/icons-vue';
 import FilePage from './views/FilePage.vue';
 import TodoPage from './views/TodoPage.vue';
+import {open} from '@tauri-apps/plugin-dialog';
+import {readDir} from '@tauri-apps/plugin-fs';
+// 【新增】引入路径拼接方法
+import {join} from '@tauri-apps/api/path';
 
 const views = {
-  file: FilePage,
-  todo: TodoPage
+  file: 'file',
+  todo: 'todo'
 };
 
-const currentView = ref(views.file); // 默认显示文件页
+const currentViewKey = ref(views.file);
+const fileTree = ref([]);
 
 const switchTo = (key) => {
-  currentView.value = views[key];
+  currentViewKey.value = key;
 };
 
-const handleImport = () => {
-  // 导入相关操作
+// 导出按钮
+const handleExport = () => {
+  console.log('导出功能待实现');
 };
+
+// 导入按钮：选择文件夹并构建文件树
+const handleImport = async () => {
+  try {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: '选择文件夹'
+    });
+    if (!selected) return;
+
+    // 开始构建文件树
+    const tree = await buildFileTree(selected);
+    fileTree.value = tree;
+  } catch (error) {
+    console.error('导入文件夹失败:', error);
+  }
+};
+
+// 递归读取目录，构建树形结构
+async function buildFileTree(dirPath) {
+  const entries = await readDir(dirPath);
+  const children = [];
+
+  for (const entry of entries) {
+    const isDir = entry.isDirectory;
+    // 【修改】手动拼接完整路径 (兼容 Windows 和 Mac 的路径分隔符)
+    const fullPath = await join(dirPath, entry.name);
+
+    const node = {
+      name: entry.name,
+      path: fullPath,
+      expanded: false,
+      children: isDir ? [] : null
+    };
+
+    if (isDir) {
+      // 【修改】使用拼接好的 fullPath 进行递归
+      node.children = await buildFileTree(fullPath);
+    }
+    children.push(node);
+  }
+
+  // 按文件夹在前、文件在后排序
+  children.sort((a, b) => {
+    if (a.children && !b.children) return -1;
+    if (!a.children && b.children) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return children;
+}
 </script>
 
 <style>

@@ -18,7 +18,39 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "default",
+          "description": "Default permissions for the app",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:default",
+            "core:window:default",
+            "dialog:default",
+            "shell:default",
+            "fs:default",
+            {
+              "identifier": "fs:allow-read-dir",
+              "allow": [
+                {
+                  "path": "**"
+                }
+              ]
+            },
+            {
+              "identifier": "fs:allow-exists",
+              "allow": [
+                {
+                  "path": "**"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   "bundle": {
