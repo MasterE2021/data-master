@@ -21,31 +21,37 @@
               :class="{ 'is-active': activePanel === 'todo' }"
               @click="togglePanel('todo')"
           />
-
           <div class="toolbar-spacer"></div>
           <el-button type="success" :icon="Download" class="tool-btn" @click="handleExport"/>
           <el-button type="success" :icon="FolderAdd" class="tool-btn" @click="handleImport"/>
         </div>
       </el-aside>
 
-      <!-- 2. 动态侧边栏面板 (有激活的面板时才显示并占用空间) -->
+      <!-- 2. 动态侧边栏面板 -->
+      <!-- 绑定动态宽度 panelWidth -->
       <el-aside
           v-show="activePanel"
-          width="300px"
+          :width="panelWidth + 'px'"
           class="side-panel"
       >
-        <!-- 文件视图 -->
-        <div v-show="activePanel === 'file'" class="panel-content">
-          <div v-if="fileTree.length === 0" class="empty-text">
-            暂无数据，请点击左下角导入文件夹
+        <!-- 面板内容区 -->
+        <div class="panel-inner">
+          <!-- 文件视图 -->
+          <div v-show="activePanel === 'file'" class="panel-content">
+            <div v-if="fileTree.length === 0" class="empty-text">
+              暂无数据，请点击左下角导入文件夹
+            </div>
+            <FilePage v-else :tree="fileTree"/>
           </div>
-          <FilePage v-else :tree="fileTree"/>
+
+          <!-- 待办视图 -->
+          <div v-show="activePanel === 'todo'" class="panel-content">
+            <TodoPage/>
+          </div>
         </div>
 
-        <!-- 待办视图 -->
-        <div v-show="activePanel === 'todo'" class="panel-content">
-          <TodoPage/>
-        </div>
+        <!-- 拖拽调整宽度的手柄 -->
+        <div class="resizer" @mousedown="startResize"></div>
       </el-aside>
 
       <!-- 3. 主工作区 -->
@@ -64,7 +70,7 @@
 </template>
 
 <script setup>
-import {ref} from 'vue';
+import {ref, onBeforeUnmount} from 'vue';
 import {FolderOpened, List, Download, FolderAdd} from '@element-plus/icons-vue';
 import FilePage from './views/FilePage.vue';
 import TodoPage from './views/TodoPage.vue';
@@ -87,50 +93,77 @@ const togglePanel = (panelName) => {
   }
 };
 
+// --- 面板宽度拖拽逻辑 ---
+const panelWidth = ref(300); // 初始宽度
+let startX = 0;
+let startWidth = 0;
+
+const startResize = (e) => {
+  startX = e.clientX;
+  startWidth = panelWidth.value;
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', stopResize);
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+};
+
+const onMouseMove = (e) => {
+  const deltaX = e.clientX - startX;
+  let newWidth = startWidth + deltaX;
+
+  // 动态计算边界限制
+  // 最小宽度：自身保留 50px
+  const MIN_WIDTH = 150;
+  // 最大宽度：窗口总宽度 - 左侧工具栏(40) - 右侧强制保留间距(100)
+  const MAX_WIDTH = window.innerWidth - 40 - 100;
+
+  // 限制 newWidth 在最小和最大值之间
+  if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
+  if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
+
+  panelWidth.value = newWidth;
+};
+
+const stopResize = () => {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup', stopResize);
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+};
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup', stopResize);
+});
+
+// --- 原有导入/构建逻辑 ---
 const handleExport = () => {
   console.log('导出功能待实现');
 };
 
 const handleImport = async () => {
   try {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: '选择文件夹'
-    });
+    const selected = await open({directory: true, multiple: false});
     if (!selected) return;
-
-    const tree = await buildFileTree(selected);
-    fileTree.value = tree;
-
-    // 导入成功后，自动展开文件面板
+    fileTree.value = await buildFileTree(selected);
     activePanel.value = 'file';
   } catch (error) {
-    console.error('导入文件夹失败:', error);
+    console.error('导入失败:', error);
   }
 };
 
 async function buildFileTree(dirPath) {
   const entries = await readDir(dirPath);
   const children = [];
-
   for (const entry of entries) {
     const isDir = entry.isDirectory;
     const fullPath = await join(dirPath, entry.name);
-
     const node = {
-      name: entry.name,
-      path: fullPath,
-      expanded: false,
-      children: isDir ? [] : null
+      name: entry.name, path: fullPath, expanded: false, children: isDir ? [] : null
     };
-
-    if (isDir) {
-      node.children = await buildFileTree(fullPath);
-    }
+    if (isDir) node.children = await buildFileTree(fullPath);
     children.push(node);
   }
-
   children.sort((a, b) => {
     if (a.children && !b.children) return -1;
     if (!a.children && b.children) return 1;
@@ -200,13 +233,38 @@ html, body {
 .side-panel {
   background-color: #f7f8fa;
   border-right: 1px solid #dcdfe6;
+  position: relative;
   display: flex;
-  flex-direction: column;
+}
+
+/* 侧边栏真实内容区，减去手柄的宽度 */
+.panel-inner {
+  flex: 1;
+  width: calc(100% - 4px);
+  height: 100%;
+  overflow: hidden;
 }
 
 .panel-content {
   height: 100%;
   overflow: auto;
+}
+
+/* --- 核心拖拽手柄样式 --- */
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+  z-index: 5;
+}
+
+.resizer:hover, .resizer:active {
+  background-color: #409eff; /* 鼠标悬停时亮起蓝边提示可拖拽 */
 }
 
 .empty-text {
