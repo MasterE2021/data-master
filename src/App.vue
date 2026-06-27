@@ -1,26 +1,40 @@
 <template>
   <el-container class="layout-container">
     <el-container>
-      <!-- 左侧工具栏 -->
+      <!-- 1. 左侧最边缘的工具栏 -->
       <el-aside width="40px" class="toolbar-aside">
         <div class="toolbar">
-          <el-button type="primary" :icon="FolderOpened" class="tool-btn" @click="switchTo('file')"/>
-          <el-button type="warning" :icon="List" class="tool-btn" @click="switchTo('todo')"/>
+          <!-- 点击文件按钮：切换文件面板的展开/收起 -->
+          <el-button
+              type="primary"
+              :icon="FolderOpened"
+              class="tool-btn"
+              :class="{ 'is-active': showFilePanel }"
+              @click="toggleFilePanel"
+          />
+          <el-button type="warning" :icon="List" class="tool-btn" @click="currentView = 'todo'"/>
           <div class="toolbar-spacer"></div>
-
-          <!-- 导出按钮（仅示意，可绑定功能） -->
           <el-button type="success" :icon="Download" class="tool-btn" @click="handleExport"/>
-
-          <!-- 新增导入按钮 -->
           <el-button type="success" :icon="FolderAdd" class="tool-btn" @click="handleImport"/>
         </div>
       </el-aside>
 
-      <!-- 主工作区 -->
+      <!-- 2. 文件树面板（有内容或被激活时才占用空间） -->
+      <el-aside
+          v-show="showFilePanel"
+          width="250px"
+          class="file-panel"
+      >
+        <div v-if="fileTree.length === 0" class="empty-text">
+          暂无数据，请点击左下角导入文件夹
+        </div>
+        <FilePage v-else :tree="fileTree"/>
+      </el-aside>
+
+      <!-- 3. 主工作区 -->
       <el-main class="main-content">
-        <!-- 文件视图需要传入文件树 -->
-        <FilePage v-if="currentViewKey === 'file'" :tree="fileTree"/>
-        <TodoPage v-else-if="currentViewKey === 'todo'"/>
+        <TodoPage v-if="currentView === 'todo'"/>
+        <div v-else class="welcome-text">欢迎使用 Data Master</div>
       </el-main>
     </el-container>
 
@@ -40,19 +54,16 @@ import FilePage from './views/FilePage.vue';
 import TodoPage from './views/TodoPage.vue';
 import {open} from '@tauri-apps/plugin-dialog';
 import {readDir} from '@tauri-apps/plugin-fs';
-// 【新增】引入路径拼接方法
 import {join} from '@tauri-apps/api/path';
 
-const views = {
-  file: 'file',
-  todo: 'todo'
-};
-
-const currentViewKey = ref(views.file);
+const currentView = ref('todo');
 const fileTree = ref([]);
 
-const switchTo = (key) => {
-  currentViewKey.value = key;
+// 控制文件面板的展开与收起
+const showFilePanel = ref(false);
+
+const toggleFilePanel = () => {
+  showFilePanel.value = !showFilePanel.value;
 };
 
 // 导出按钮
@@ -70,22 +81,24 @@ const handleImport = async () => {
     });
     if (!selected) return;
 
-    // 开始构建文件树
+    // 构建文件树
     const tree = await buildFileTree(selected);
     fileTree.value = tree;
+
+    // 导入成功后自动展开文件树面板
+    showFilePanel.value = true;
   } catch (error) {
     console.error('导入文件夹失败:', error);
   }
 };
 
-// 递归读取目录，构建树形结构
+// 递归读取目录
 async function buildFileTree(dirPath) {
   const entries = await readDir(dirPath);
   const children = [];
 
   for (const entry of entries) {
     const isDir = entry.isDirectory;
-    // 【修改】手动拼接完整路径 (兼容 Windows 和 Mac 的路径分隔符)
     const fullPath = await join(dirPath, entry.name);
 
     const node = {
@@ -96,19 +109,16 @@ async function buildFileTree(dirPath) {
     };
 
     if (isDir) {
-      // 【修改】使用拼接好的 fullPath 进行递归
       node.children = await buildFileTree(fullPath);
     }
     children.push(node);
   }
 
-  // 按文件夹在前、文件在后排序
   children.sort((a, b) => {
     if (a.children && !b.children) return -1;
     if (!a.children && b.children) return 1;
     return a.name.localeCompare(b.name);
   });
-
   return children;
 }
 </script>
@@ -139,14 +149,13 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
 }
 
 .toolbar {
   display: flex;
   flex-direction: column;
-  align-items: center;
   height: 100%;
   width: 100%;
 }
@@ -159,16 +168,48 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
+}
+
+/* 文件按钮激活时的样式 */
+.tool-btn.is-active {
+  background-color: #1a252f;
+  border-left: 3px solid #409eff;
 }
 
 .toolbar-spacer {
   flex: 1;
 }
 
+/* 文件树面板样式 */
+.file-panel {
+  background-color: #f7f8fa;
+  border-right: 1px solid #dcdfe6;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.empty-text {
+  padding: 20px;
+  color: #909399;
+  font-size: 13px;
+  text-align: center;
+}
+
 .main-content {
   background-color: #ffffff;
   padding: 24px;
   overflow: auto;
+}
+
+.welcome-text {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #909399;
+  font-size: 20px;
 }
 
 .status-bar {
@@ -183,8 +224,7 @@ html, body {
   line-height: 32px;
 }
 
-.status-left,
-.status-right {
+.status-left, .status-right {
   flex: 1;
 }
 
