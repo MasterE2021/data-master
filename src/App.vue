@@ -4,43 +4,59 @@
       <!-- 1. 左侧最边缘的工具栏 -->
       <el-aside width="40px" class="toolbar-aside">
         <div class="toolbar">
-          <!-- 点击文件按钮：切换文件面板的展开/收起 -->
-          <el-button
-              type="primary"
-              :icon="FolderOpened"
-              class="tool-btn"
-              :class="{ 'is-active': showFilePanel }"
-              @click="toggleFilePanel"
+
+          <!-- 文件面板按钮 -->
+          <el-button type="primary"
+                     :icon="FolderOpened"
+                     class="tool-btn"
+                     :class="{ 'is-active': activePanel === 'file' }"
+                     @click="togglePanel('file')"
           />
-          <el-button type="warning" :icon="List" class="tool-btn" @click="currentView = 'todo'"/>
+
+          <!-- 待办事项面板按钮 -->
+          <el-button
+              type="warning"
+              :icon="List"
+              class="tool-btn"
+              :class="{ 'is-active': activePanel === 'todo' }"
+              @click="togglePanel('todo')"
+          />
+
           <div class="toolbar-spacer"></div>
           <el-button type="success" :icon="Download" class="tool-btn" @click="handleExport"/>
           <el-button type="success" :icon="FolderAdd" class="tool-btn" @click="handleImport"/>
         </div>
       </el-aside>
 
-      <!-- 2. 文件树面板（有内容或被激活时才占用空间） -->
+      <!-- 2. 动态侧边栏面板 (有激活的面板时才显示并占用空间) -->
       <el-aside
-          v-show="showFilePanel"
-          width="250px"
-          class="file-panel"
+          v-show="activePanel"
+          width="300px"
+          class="side-panel"
       >
-        <div v-if="fileTree.length === 0" class="empty-text">
-          暂无数据，请点击左下角导入文件夹
+        <!-- 文件视图 -->
+        <div v-show="activePanel === 'file'" class="panel-content">
+          <div v-if="fileTree.length === 0" class="empty-text">
+            暂无数据，请点击左下角导入文件夹
+          </div>
+          <FilePage v-else :tree="fileTree"/>
         </div>
-        <FilePage v-else :tree="fileTree"/>
+
+        <!-- 待办视图 -->
+        <div v-show="activePanel === 'todo'" class="panel-content">
+          <TodoPage/>
+        </div>
       </el-aside>
 
       <!-- 3. 主工作区 -->
       <el-main class="main-content">
-        <TodoPage v-if="currentView === 'todo'"/>
-        <div v-else class="welcome-text">欢迎使用 Data Master</div>
+        <div class="welcome-text">主工作区 (可用于显示文件详情或报表)</div>
       </el-main>
     </el-container>
 
     <!-- 底部状态栏 -->
     <el-footer height="32px" class="status-bar">
-      <div class="status-left"></div>
+      <div class="status-left">当前面板: {{ activePanel || '已收起' }}</div>
       <div class="status-center">v1.0.0</div>
       <div class="status-right">状态栏：就绪</div>
     </el-footer>
@@ -56,22 +72,25 @@ import {open} from '@tauri-apps/plugin-dialog';
 import {readDir} from '@tauri-apps/plugin-fs';
 import {join} from '@tauri-apps/api/path';
 
-const currentView = ref('todo');
+// 记录当前激活的面板：'file' | 'todo' | '' (空字符串代表收起)
+const activePanel = ref('file');
 const fileTree = ref([]);
 
-// 控制文件面板的展开与收起
-const showFilePanel = ref(false);
-
-const toggleFilePanel = () => {
-  showFilePanel.value = !showFilePanel.value;
+// 切换面板的核心逻辑
+const togglePanel = (panelName) => {
+  if (activePanel.value === panelName) {
+    // 如果点击的是当前已展开的面板，则收起
+    activePanel.value = '';
+  } else {
+    // 否则切换到对应的面板
+    activePanel.value = panelName;
+  }
 };
 
-// 导出按钮
 const handleExport = () => {
   console.log('导出功能待实现');
 };
 
-// 导入按钮：选择文件夹并构建文件树
 const handleImport = async () => {
   try {
     const selected = await open({
@@ -81,18 +100,16 @@ const handleImport = async () => {
     });
     if (!selected) return;
 
-    // 构建文件树
     const tree = await buildFileTree(selected);
     fileTree.value = tree;
 
-    // 导入成功后自动展开文件树面板
-    showFilePanel.value = true;
+    // 导入成功后，自动展开文件面板
+    activePanel.value = 'file';
   } catch (error) {
     console.error('导入文件夹失败:', error);
   }
 };
 
-// 递归读取目录
 async function buildFileTree(dirPath) {
   const entries = await readDir(dirPath);
   const children = [];
@@ -171,7 +188,6 @@ html, body {
   border: none;
 }
 
-/* 文件按钮激活时的样式 */
 .tool-btn.is-active {
   background-color: #1a252f;
   border-left: 3px solid #409eff;
@@ -181,12 +197,15 @@ html, body {
   flex: 1;
 }
 
-/* 文件树面板样式 */
-.file-panel {
+.side-panel {
   background-color: #f7f8fa;
   border-right: 1px solid #dcdfe6;
   display: flex;
   flex-direction: column;
+}
+
+.panel-content {
+  height: 100%;
   overflow: auto;
 }
 
