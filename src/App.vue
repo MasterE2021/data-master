@@ -1,148 +1,134 @@
 <template>
-  <div class="todo-container">
-    <h2>📝 待办事项 (Vue + Python)</h2>
+  <el-container class="layout-container">
+    <el-container>
+      <!-- 左侧工具栏 -->
+      <el-aside width="40px" class="toolbar-aside">
+        <div class="toolbar">
+          <el-button type="primary" :icon="FolderOpened" class="tool-btn" @click="switchTo('file')"/>
+          <el-button type="warning" :icon="List" class="tool-btn" @click="switchTo('todo')"/>
+          <div class="toolbar-spacer"></div>
+          <el-button type="success" :icon="Upload" class="tool-btn" @click="handleImport"/>
+        </div>
+      </el-aside>
 
-    <div class="input-group">
-      <input
-          v-model="newTodo"
-          @keyup.enter="addTodo"
-          placeholder="添加新的待办事项..."
-      />
-      <button @click="addTodo">添加</button>
-    </div>
+      <!-- 主工作区：动态加载视图 -->
+      <el-main class="main-content">
+        <component :is="currentView"/>
+      </el-main>
+    </el-container>
 
-    <ul class="todo-list">
-      <li v-for="todo in todos" :key="todo.id" :class="{ completed: todo.completed }">
-        <span @click="toggleTodo(todo.id)" class="text">
-          {{ todo.completed ? '✅' : '⏳' }} {{ todo.title }}
-        </span>
-        <button @click="deleteTodo(todo.id)" class="delete-btn">删除</button>
-      </li>
-    </ul>
-  </div>
+    <!-- 底部状态栏 -->
+    <el-footer height="32px" class="status-bar">
+      <div class="status-left"></div>
+      <div class="status-center">v1.0.0</div>
+      <div class="status-right">状态栏：就绪</div>
+    </el-footer>
+  </el-container>
 </template>
 
-<script setup lang="ts">
-import {ref, onMounted} from 'vue';
+<script setup>
+import {ref} from 'vue';
+import {FolderOpened, List, Upload} from '@element-plus/icons-vue';
+import FilePage from './views/FilePage.vue';
+import TodoPage from './views/TodoPage.vue';
 
-// Python FastAPI 后端地址
-const API_URL = 'http://127.0.0.1:8000/todos';
-
-interface Todo {
-  id: number;
-  title: string;
-  completed: boolean;
-}
-
-const todos = ref<Todo[]>([]);
-const newTodo = ref('');
-
-// 获取待办列表
-const fetchTodos = async () => {
-  try {
-    const res = await fetch(API_URL);
-    todos.value = await res.json();
-  } catch (error) {
-    console.error("无法连接到 Python 后端:", error);
-  }
+const views = {
+  file: FilePage,
+  todo: TodoPage
 };
 
-// 添加待办
-const addTodo = async () => {
-  if (!newTodo.value.trim()) return;
-  await fetch(API_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({title: newTodo.value})
-  });
-  newTodo.value = '';
-  await fetchTodos();
+const currentView = ref(views.file); // 默认显示文件页
+
+const switchTo = (key) => {
+  currentView.value = views[key];
 };
 
-// 切换完成状态
-const toggleTodo = async (id: number) => {
-  await fetch(`${API_URL}/${id}`, {method: 'PUT'});
-  await fetchTodos();
+const handleImport = () => {
+  // 导入相关操作
 };
-
-// 删除待办
-const deleteTodo = async (id: number) => {
-  await fetch(`${API_URL}/${id}`, {method: 'DELETE'});
-  await fetchTodos();
-};
-
-// 组件挂载时获取数据
-onMounted(() => {
-  fetchTodos();
-});
 </script>
 
-<style scoped>
-.todo-container {
-  background: #574c4c;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 400px;
-}
-
-.input-group {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-input {
-  flex: 1;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-button {
-  padding: 8px 16px;
-  background: #4f46e5;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #4338ca;
-}
-
-.todo-list {
-  list-style: none;
-  padding: 0;
+<style>
+html, body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
-li {
+#app {
+  height: 100%;
+}
+</style>
+
+<style scoped>
+.layout-container {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.toolbar-aside {
+  background-color: #2c3e50;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+  padding: 0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
-.text {
-  cursor: pointer;
-  user-select: none;
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  width: 100%;
 }
 
-.completed .text {
-  text-decoration: line-through;
-  color: #888;
+.tool-btn {
+  width: 100%;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.delete-btn {
-  background: #ef4444;
-  font-size: 12px;
-  padding: 4px 8px;
+.toolbar-spacer {
+  flex: 1;
 }
 
-.delete-btn:hover {
-  background: #dc2626;
+.main-content {
+  background-color: #ffffff;
+  padding: 24px;
+  overflow: auto;
+}
+
+.status-bar {
+  background-color: #e9eef3;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 13px;
+  color: #606266;
+  border-top: 1px solid #dcdfe6;
+  height: 32px;
+  line-height: 32px;
+}
+
+.status-left,
+.status-right {
+  flex: 1;
+}
+
+.status-center {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.status-right {
+  text-align: right;
 }
 </style>
