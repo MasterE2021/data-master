@@ -76,7 +76,7 @@ import FilePage from './views/FilePage.vue';
 import TodoPage from './views/TodoPage.vue';
 import {open} from '@tauri-apps/plugin-dialog';
 import {readDir} from '@tauri-apps/plugin-fs';
-import {join} from '@tauri-apps/api/path';
+import {join, basename} from '@tauri-apps/api/path';
 
 // 记录当前激活的面板：'file' | 'todo' | '' (空字符串代表收起)
 const activePanel = ref();
@@ -145,7 +145,23 @@ const handleImport = async () => {
   try {
     const selected = await open({directory: true, multiple: false});
     if (!selected) return;
-    fileTree.value = await buildFileTree(selected);
+
+    // 2. 读取子文件树
+    const childrenTree = await buildFileTree(selected);
+
+    // 3. 获取根文件夹的名称
+    const rootName = await basename(selected);
+
+    // 4. 将结果包装成一个带有根节点的树结构
+    fileTree.value = [
+      {
+        name: rootName,           // 根文件夹名称
+        path: selected,           // 根文件夹完整路径
+        expanded: true,           // 默认展开根节点
+        children: childrenTree
+      }
+    ];
+
     activePanel.value = 'file';
   } catch (error) {
     console.error('导入失败:', error);
