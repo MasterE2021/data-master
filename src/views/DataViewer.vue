@@ -7,28 +7,30 @@
 
       <div class="table-header">
         <h3>数据预览: {{ fileName }}</h3>
-        <div class="total-text">总计: {{ total }} 行</div>
+        <div class="total-text">总计: {{ total }} 行 (单页 1000 行)</div>
       </div>
 
-      <!-- 表格区域 -->
+      <!-- vxe-table 虚拟滚动表格区域 -->
       <div class="table-body">
-        <el-table
-            :data="tableData"
+        <vxe-table
             border
             stripe
-            height="100%"
-            style="width: 100%"
-            v-loading="loading"
+            show-overflow
+            height="auto"
+            auto-resize
+            :data="tableData"
+            :loading="loading"
+            :scroll-y="{ enabled: true, gt: 100 }"
         >
-          <el-table-column
+          <!-- 动态渲染列 -->
+          <vxe-column
               v-for="col in columns"
               :key="col"
-              :prop="col"
-              :label="col"
+              :field="col"
+              :title="col"
               min-width="120"
-              show-overflow-tooltip
           />
-        </el-table>
+        </vxe-table>
       </div>
 
       <!-- 自定义精简分页区域 -->
@@ -74,9 +76,9 @@ const tableData = ref([]);
 const loading = ref(false);
 const error = ref('');
 
-// 分页状态
+// 分页状态 (恢复 1000 行)
 const currentPage = ref(1);
-const inputPage = ref(1); // 绑定输入框的独立状态
+const inputPage = ref(1);
 const pageSize = ref(1000);
 const total = ref(0);
 
@@ -93,25 +95,22 @@ const maxPage = computed(() => {
 const goToPage = (page) => {
   if (page >= 1 && page <= maxPage.value && page !== currentPage.value) {
     currentPage.value = page;
-    inputPage.value = page; // 同步输入框
+    inputPage.value = page;
     fetchData();
   }
 };
 
 // 输入框回车/失焦跳转
 const handleJump = () => {
-  // 解析输入值为整数，如果非法则重置为当前页
   let target = parseInt(inputPage.value, 10);
   if (isNaN(target)) {
     inputPage.value = currentPage.value;
     return;
   }
 
-  // 限制边界
   if (target < 1) target = 1;
   if (target > maxPage.value) target = maxPage.value;
 
-  // 更新状态并拉取数据
   inputPage.value = target;
   if (target !== currentPage.value) {
     currentPage.value = target;
@@ -235,7 +234,6 @@ watch(() => props.filePath, (newPath) => {
   border-bottom: 1px solid #dcdfe6;
 }
 
-/* 隐藏原生输入框的边框和背景，使其融入设计 */
 .page-input {
   width: 40px;
   height: 24px;
