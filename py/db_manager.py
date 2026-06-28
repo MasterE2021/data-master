@@ -3,6 +3,8 @@
 import sys
 import os
 import sqlite3
+from typing import Any
+
 import duckdb
 
 
@@ -17,32 +19,14 @@ class SQLiteManager:
         self.conn = sqlite3.connect(db_path)
         # 启用 WAL 模式提升并发写入性能
         self.conn.execute("PRAGMA journal_mode=WAL")
-        self._create_table()
 
-    def _create_table(self):
-        """创建记录表（如果不存在）"""
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS file_records "
-            "(path TEXT PRIMARY KEY, ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-        )
+    def exec_sql(self, sql: str):
+        self.conn.execute(sql)
         self.conn.commit()
 
-    def add_record(self, path):
-        """插入或更新文件路径记录（自动更新时间戳），并立即提交。"""
-        self.conn.execute(
-            "INSERT OR REPLACE INTO file_records (path, ts) VALUES (?, CURRENT_TIMESTAMP)",
-            (path,)
-        )
-        self.conn.commit()
-
-    def get_records(self):
-        """返回按时间倒序排列的文件路径列表。"""
-        cursor = self.conn.execute("SELECT path FROM file_records ORDER BY ts DESC")
+    def run_sql(self, sql: str) -> list[Any]:
+        cursor = self.conn.execute(sql)
         return [row[0] for row in cursor.fetchall()]
-
-    def close(self):
-        """关闭数据库连接。"""
-        self.conn.close()
 
 
 class DuckDBManager:
@@ -71,7 +55,7 @@ class DuckDBManager:
             self.conn.query(f"load '{safe_path}'")
 
         loaded_ext = self.conn.query(
-            "SELECT extension_name FROM duckdb_extensions() WHERE loaded = true"
+            "select extension_name from duckdb_extensions() where loaded = true"
         ).fetchall()
         print(f"--- DuckDB 已成功加载的插件: {[row[0] for row in loaded_ext]} ---")
 
