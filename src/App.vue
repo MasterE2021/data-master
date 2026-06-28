@@ -79,7 +79,7 @@ import {readDir} from '@tauri-apps/plugin-fs';
 import {join} from '@tauri-apps/api/path';
 
 // 记录当前激活的面板：'file' | 'todo' | '' (空字符串代表收起)
-const activePanel = ref('file');
+const activePanel = ref();
 const fileTree = ref([]);
 
 // 切换面板的核心逻辑
