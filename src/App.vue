@@ -23,7 +23,6 @@
         <div class="panel-inner">
           <div v-show="activePanel === 'file'" class="panel-content">
             <div v-if="!rootPath" class="empty-text">暂无数据，请点击左下角导入文件夹</div>
-            <!-- 将根路径传递给 FilePage，由它自己去懒加载 -->
             <FilePage v-else :root-path="rootPath" :root-name="rootName"/>
           </div>
           <div v-show="activePanel === 'todo'" class="panel-content">
@@ -49,22 +48,37 @@
 </template>
 
 <script setup>
-import {ref, onBeforeUnmount} from 'vue';
+import {ref, onBeforeUnmount, onMounted} from 'vue';
 import {FolderOpened, List, Download, FolderAdd} from '@element-plus/icons-vue';
 import FilePage from './views/FilePage.vue';
 import TodoPage from './views/TodoPage.vue';
 import {open} from '@tauri-apps/plugin-dialog';
-import {basename} from '@tauri-apps/api/path'; // 移除 readDir 和 join
+import {basename} from '@tauri-apps/api/path';
 
 const activePanel = ref('');
 const rootPath = ref('');
 const rootName = ref('');
 
+// ========== 启动时加载历史记录 ==========
+onMounted(async () => {
+  try {
+    const res = await fetch('http://127.0.0.1:8000/file/history/latest');
+    const data = await res.json();
+    if (data && data.path && data.name) {
+      rootPath.value = data.path;
+      rootName.value = data.name;
+      activePanel.value = 'file'; // 有记录则直接展开侧边栏
+    }
+  } catch (err) {
+    console.error('获取历史导入记录失败:', err);
+  }
+});
+
 const togglePanel = (panelName) => {
   activePanel.value = activePanel.value === panelName ? '' : panelName;
 };
 
-// --- 宽度拖拽逻辑 (保持不变) ---
+// --- 宽度拖拽逻辑 ---
 const panelWidth = ref(300);
 let startX = 0, startWidth = 0;
 const startResize = (e) => {
@@ -97,7 +111,7 @@ const handleExport = () => {
   console.log('导出功能待实现');
 };
 
-// 修改后的导入逻辑：只记录选中的根路径，不做任何递归读取！大大提升性能！
+// ========== 导入文件及保存记录逻辑 ==========
 const handleImport = async () => {
   try {
     const selected = await open({directory: true, multiple: false});
@@ -106,6 +120,13 @@ const handleImport = async () => {
     rootPath.value = selected;
     rootName.value = await basename(selected);
     activePanel.value = 'file';
+
+    // 导入成功后，通知后端保存记录
+    await fetch('http://127.0.0.1:8000/file/history', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path: rootPath.value, name: rootName.value})
+    });
   } catch (error) {
     console.error('导入失败:', error);
   }
@@ -127,7 +148,6 @@ html, body {
 </style>
 
 <style scoped>
-/* 严格限制高度，防止内容撑爆 */
 .layout-container {
   height: 100vh;
   width: 100vw;
@@ -141,16 +161,13 @@ html, body {
   overflow: hidden;
 }
 
-/* 占据除了底部状态栏的所有高度 */
-
 .toolbar-aside {
   background-color: #2c3e50;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
   z-index: 10;
-  height: 100%; /* 保证占满父级 */
+  height: 100%;
 }
 
-/* 强制工具栏内部的 flex 布局不会被挤出去 */
 .toolbar {
   display: flex;
   flex-direction: column;
@@ -166,8 +183,6 @@ html, body {
 .toolbar-spacer {
   flex: 1;
 }
-
-/* 自动撑开中间空白 */
 
 .tool-btn {
   width: 100%;
@@ -204,8 +219,6 @@ html, body {
   width: 100%;
   overflow: auto;
 }
-
-/* 核心：允许滚动条 */
 
 .resizer {
   position: absolute;

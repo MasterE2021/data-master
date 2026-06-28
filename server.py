@@ -5,6 +5,7 @@ import uvicorn
 import sys
 import os
 from py import service_todo
+from py import service_file  # 新增导入文件服务
 from py import db_manager
 
 
@@ -26,8 +27,9 @@ class App(FastAPI):
             allow_headers=["*"],
         )
 
-        # 挂载待办事项的服务的路由
+        # 挂载服务路由
         self.include_router(service_todo.router)
+        self.include_router(service_file.router)  # 挂载文件历史记录路由
 
     def init_db(self):
         data_dir = os.path.join(os.path.expanduser("~"), ".data-master")
@@ -36,6 +38,9 @@ class App(FastAPI):
 
         self.db_duckdb = db_manager.DuckDBManager()
         self.db_sqlite = db_manager.SQLiteManager(db_path)
+
+        # 将 sqlite 实例挂载到 app.state 上，方便各个路由模块内部调用
+        self.state.db_sqlite = self.db_sqlite
 
 
 if __name__ == "__main__":

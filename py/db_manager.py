@@ -16,17 +16,32 @@ class SQLiteManager:
     """
 
     def __init__(self, db_path):
-        self.conn = sqlite3.connect(db_path)
+        # 允许多线程共享连接（FastAPI 需要）
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
         # 启用 WAL 模式提升并发写入性能
         self.conn.execute("PRAGMA journal_mode=WAL")
+        # 初始化数据表
+        self._init_tables()
 
-    def exec_sql(self, sql: str):
-        self.conn.execute(sql)
+    def _init_tables(self):
+        # 创建导入历史记录表
+        sql = """
+        CREATE TABLE IF NOT EXISTS import_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT NOT NULL,
+            name TEXT NOT NULL,
+            import_time DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        self.exec_sql(sql)
+
+    def exec_sql(self, sql: str, params: tuple = ()):
+        self.conn.execute(sql, params)
         self.conn.commit()
 
-    def run_sql(self, sql: str) -> list[Any]:
-        cursor = self.conn.execute(sql)
-        return [row[0] for row in cursor.fetchall()]
+    def run_sql(self, sql: str, params: tuple = ()) -> list[Any]:
+        cursor = self.conn.execute(sql, params)
+        return cursor.fetchall()
 
 
 class DuckDBManager:
