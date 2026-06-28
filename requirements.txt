@@ -1,5 +1,14 @@
-fastapi
-uvicorn
-pydantic
+# Python Web 框架
+fastapi==0.138.1
 
+# 一个基于 ASGI（异步服务器网关接口）标准的、闪电般快速的 Python Web 服务器
+uvicorn==0.49.0
+
+# 一个能够将 Python 脚本及其所有依赖项打包成独立可执行文件
+pyinstaller==6.21.0
+
+# 一个基于 Python 类型注解（Type Hints）的数据验证和解析库
+pydantic==2.13.4
+
+# 一款开源、高性能的进程内（In-Process）分析型关系数据库
 duckdb==1.4.1
