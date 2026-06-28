@@ -223,7 +223,7 @@ html, body {
 
 .tool-btn.is-active {
   background-color: #1a252f;
-  border-left: 3px solid #409eff;
+  border-left: 3px solid #9bc19b;
 }
 
 .toolbar-spacer {
