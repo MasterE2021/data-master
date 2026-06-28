@@ -11,6 +11,7 @@
           empty-text="加载中..."
           highlight-current
           class="custom-tree"
+          @node-collapse="handleNodeCollapse"
       >
         <template #default="{ node, data }">
           <!-- 动态绑定 class，用于区分根节点样式 -->
@@ -93,6 +94,15 @@ const loadNode = async (node, resolve) => {
     resolve([]);
   }
 };
+
+// ========== 新增：处理节点折叠事件 ==========
+const handleNodeCollapse = (data, node) => {
+  // 当文件夹折叠时，清空该节点的缓存，并标记为未加载
+  // 这样下次展开时，就会重新调用 loadNode 刷新最新的本地文件
+  node.loaded = false;
+  node.childNodes = [];
+};
+
 </script>
 
 <style scoped>
