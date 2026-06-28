@@ -1,3 +1,4 @@
+<!-- src/App.vue -->
 <template>
   <el-container class="layout-container">
     <el-container class="main-body">
@@ -24,7 +25,7 @@
           <div v-show="activePanel === 'file'" class="panel-content">
             <div v-if="workspaceFolders.length === 0" class="empty-text">暂无数据，请点击左下角导入文件夹</div>
             <!-- 传入所有的根文件夹 -->
-            <FilePage v-else :workspace-folders="workspaceFolders"/>
+            <FilePage v-else :workspace-folders="workspaceFolders" @file-click="handleFileClick"/>
           </div>
           <div v-show="activePanel === 'todo'" class="panel-content">
             <TodoPage/>
@@ -35,7 +36,13 @@
 
       <!-- 3. 主工作区 -->
       <el-main class="main-content">
-        <div class="welcome-text">主工作区</div>
+        <!-- 如果没有选中文件，显示提示 -->
+        <div v-if="!currentFilePath" class="welcome-text">
+          请在左侧点击 CSV/Parquet/Excel 文件进行预览
+        </div>
+
+        <!-- 如果选中了文件，渲染独立的数据组件 -->
+        <DataViewer v-else :file-path="currentFilePath"/>
       </el-main>
     </el-container>
 
@@ -53,11 +60,18 @@ import {ref, onBeforeUnmount, onMounted} from 'vue';
 import {FolderOpened, List, Download, FolderAdd} from '@element-plus/icons-vue';
 import FilePage from './views/FilePage.vue';
 import TodoPage from './views/TodoPage.vue';
+import DataViewer from './views/DataViewer.vue';
 import {open} from '@tauri-apps/plugin-dialog';
 import {basename} from '@tauri-apps/api/path';
 
+const currentFilePath = ref('');
 const activePanel = ref('');
 const workspaceFolders = ref([]); // 改为数组，支持多个根文件夹
+
+// 接收 FilePage 传来的点击事件
+const handleFileClick = (path) => {
+  currentFilePath.value = path;
+};
 
 // ========== 启动时加载历史记录 ==========
 onMounted(async () => {

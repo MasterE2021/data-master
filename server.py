@@ -5,7 +5,8 @@ import uvicorn
 import sys
 import os
 from py import service_todo
-from py import service_file  # 新增导入文件服务
+from py import service_file
+from py import service_data
 from py import db_manager
 
 
@@ -29,7 +30,8 @@ class App(FastAPI):
 
         # 挂载服务路由
         self.include_router(service_todo.router)
-        self.include_router(service_file.router)  # 挂载文件历史记录路由
+        self.include_router(service_file.router)
+        self.include_router(service_data.router)
 
     def init_db(self):
         data_dir = os.path.join(os.path.expanduser("~"), ".data-master")

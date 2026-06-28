@@ -12,6 +12,7 @@
           highlight-current
           class="custom-tree"
           @node-collapse="handleNodeCollapse"
+          @node-click="handleNodeClick"
       >
         <template #default="{ node, data }">
           <!-- 动态绑定 class，用于区分根节点样式 -->
@@ -31,7 +32,7 @@
 </template>
 
 <script setup>
-import {defineProps, ref, watch} from 'vue';
+import {defineProps, ref, watch, defineEmits} from 'vue';
 import {readDir} from '@tauri-apps/plugin-fs';
 import {join} from '@tauri-apps/api/path';
 
@@ -101,6 +102,20 @@ const handleNodeCollapse = (data, node) => {
   // 这样下次展开时，就会重新调用 loadNode 刷新最新的本地文件
   node.loaded = false;
   node.childNodes = [];
+};
+
+const emit = defineEmits(['file-click']);
+
+const handleNodeClick = (data) => {
+  // 如果是文件（不是文件夹）
+  if (data.isLeaf) {
+    // 获取后缀名
+    const ext = data.path.split('.').pop().toLowerCase();
+    // 如果是支持的表格文件，通知 App.vue
+    if (['csv', 'parquet', 'xlsx'].includes(ext)) {
+      emit('file-click', data.path);
+    }
+  }
 };
 
 </script>
