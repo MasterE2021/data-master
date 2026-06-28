@@ -1,35 +1,69 @@
 <!-- src/views/DataViewer.vue -->
 <template>
   <div class="data-viewer-container">
-    <div v-if="loading" class="loading-text">数据加载中...</div>
+    <div v-if="loading && !tableData.length" class="loading-text">数据加载中...</div>
     <div v-else-if="error" class="error-text">读取失败: {{ error }}</div>
     <div v-else class="table-wrapper">
+
       <div class="table-header">
         <h3>数据预览: {{ fileName }}</h3>
-        <span class="row-count">预览前 100 行</span>
+        <div class="total-text">总计: {{ total }} 行</div>
       </div>
-      <el-table
-          :data="tableData"
-          border
-          stripe
-          height="100%"
-          style="width: 100%"
-      >
-        <el-table-column
-            v-for="col in columns"
-            :key="col"
-            :prop="col"
-            :label="col"
-            min-width="120"
-            show-overflow-tooltip
-        />
-      </el-table>
+
+      <!-- 表格区域 -->
+      <div class="table-body">
+        <el-table
+            :data="tableData"
+            border
+            stripe
+            height="100%"
+            style="width: 100%"
+            v-loading="loading"
+        >
+          <el-table-column
+              v-for="col in columns"
+              :key="col"
+              :prop="col"
+              :label="col"
+              min-width="120"
+              show-overflow-tooltip
+          />
+        </el-table>
+      </div>
+
+      <!-- 自定义精简分页区域 -->
+      <div class="pagination-wrapper">
+        <el-button-group class="custom-pager">
+          <el-button :icon="DArrowLeft" :disabled="currentPage === 1" @click="goToPage(1)" title="首页"/>
+          <el-button :icon="ArrowLeft" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" title="上一页"/>
+
+          <div class="page-display">
+            <!-- 可编辑的页码输入框 -->
+            <input
+                v-model="inputPage"
+                class="page-input"
+                type="text"
+                @keyup.enter="handleJump"
+                @blur="handleJump"
+                title="输入页码后回车跳转"
+            />
+            <span class="page-total">/ {{ maxPage }}</span>
+          </div>
+
+          <el-button :icon="ArrowRight" :disabled="currentPage === maxPage || maxPage === 0"
+                     @click="goToPage(currentPage + 1)" title="下一页"/>
+          <el-button :icon="DArrowRight" :disabled="currentPage === maxPage || maxPage === 0" @click="goToPage(maxPage)"
+                     title="尾页"/>
+        </el-button-group>
+      </div>
+
     </div>
   </div>
 </template>
 
 <script setup>
 import {ref, watch, computed} from 'vue';
+import {ArrowLeft, ArrowRight, DArrowLeft, DArrowRight} from '@element-plus/icons-vue';
 
 const props = defineProps({
   filePath: {type: String, required: true}
@@ -40,14 +74,53 @@ const tableData = ref([]);
 const loading = ref(false);
 const error = ref('');
 
+// 分页状态
+const currentPage = ref(1);
+const inputPage = ref(1); // 绑定输入框的独立状态
+const pageSize = ref(1000);
+const total = ref(0);
+
 const fileName = computed(() => {
   return props.filePath.split(/[/\\]/).pop();
 });
 
-// 监听文件路径变化，自动请求新数据
-watch(() => props.filePath, async (newPath) => {
-  if (!newPath) return;
+// 计算最大页数
+const maxPage = computed(() => {
+  return Math.ceil(total.value / pageSize.value) || 1;
+});
 
+// 点击按钮跳转
+const goToPage = (page) => {
+  if (page >= 1 && page <= maxPage.value && page !== currentPage.value) {
+    currentPage.value = page;
+    inputPage.value = page; // 同步输入框
+    fetchData();
+  }
+};
+
+// 输入框回车/失焦跳转
+const handleJump = () => {
+  // 解析输入值为整数，如果非法则重置为当前页
+  let target = parseInt(inputPage.value, 10);
+  if (isNaN(target)) {
+    inputPage.value = currentPage.value;
+    return;
+  }
+
+  // 限制边界
+  if (target < 1) target = 1;
+  if (target > maxPage.value) target = maxPage.value;
+
+  // 更新状态并拉取数据
+  inputPage.value = target;
+  if (target !== currentPage.value) {
+    currentPage.value = target;
+    fetchData();
+  }
+};
+
+// 获取数据
+const fetchData = async () => {
   loading.value = true;
   error.value = '';
 
@@ -55,7 +128,12 @@ watch(() => props.filePath, async (newPath) => {
     const res = await fetch('http://127.0.0.1:8000/data/preview', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({path: newPath})
+      body: JSON.stringify({
+        path: props.filePath,
+        page: currentPage.value,
+        page_size: pageSize.value,
+        total: total.value
+      })
     });
     const result = await res.json();
 
@@ -64,12 +142,23 @@ watch(() => props.filePath, async (newPath) => {
     } else {
       columns.value = result.columns;
       tableData.value = result.data;
+      total.value = result.total;
     }
   } catch (err) {
     error.value = '网络请求异常: ' + err.message;
   } finally {
     loading.value = false;
   }
+};
+
+// 监听文件路径变化
+watch(() => props.filePath, (newPath) => {
+  if (!newPath) return;
+  currentPage.value = 1;
+  inputPage.value = 1;
+  total.value = 0;
+  tableData.value = [];
+  fetchData();
 }, {immediate: true});
 </script>
 
@@ -113,8 +202,62 @@ watch(() => props.filePath, async (newPath) => {
   color: #303133;
 }
 
-.row-count {
-  font-size: 12px;
+.total-text {
+  font-size: 13px;
+  color: #606266;
+}
+
+.table-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.pagination-wrapper {
+  flex: 0 0 auto;
+  padding-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.custom-pager {
+  display: flex;
+  align-items: center;
+}
+
+.page-display {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 32px;
+  background-color: #f4f4f5;
+  border-top: 1px solid #dcdfe6;
+  border-bottom: 1px solid #dcdfe6;
+}
+
+/* 隐藏原生输入框的边框和背景，使其融入设计 */
+.page-input {
+  width: 40px;
+  height: 24px;
+  text-align: center;
+  font-weight: bold;
+  color: #409eff;
+  border: 1px solid transparent;
+  background-color: transparent;
+  outline: none;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.page-input:focus, .page-input:hover {
+  border-color: #c6e2ff;
+  background-color: #ffffff;
+}
+
+.page-total {
+  margin-left: 4px;
   color: #909399;
+  font-size: 13px;
 }
 </style>
