@@ -22,8 +22,9 @@
       <el-aside v-show="activePanel" :width="panelWidth + 'px'" class="side-panel">
         <div class="panel-inner">
           <div v-show="activePanel === 'file'" class="panel-content">
-            <div v-if="!rootPath" class="empty-text">暂无数据，请点击左下角导入文件夹</div>
-            <FilePage v-else :root-path="rootPath" :root-name="rootName"/>
+            <div v-if="workspaceFolders.length === 0" class="empty-text">暂无数据，请点击左下角导入文件夹</div>
+            <!-- 传入所有的根文件夹 -->
+            <FilePage v-else :workspace-folders="workspaceFolders"/>
           </div>
           <div v-show="activePanel === 'todo'" class="panel-content">
             <TodoPage/>
@@ -56,17 +57,15 @@ import {open} from '@tauri-apps/plugin-dialog';
 import {basename} from '@tauri-apps/api/path';
 
 const activePanel = ref('');
-const rootPath = ref('');
-const rootName = ref('');
+const workspaceFolders = ref([]); // 改为数组，支持多个根文件夹
 
 // ========== 启动时加载历史记录 ==========
 onMounted(async () => {
   try {
-    const res = await fetch('http://127.0.0.1:8000/file/history/latest');
+    const res = await fetch('http://127.0.0.1:8000/file/history/all'); // 调用新接口
     const data = await res.json();
-    if (data && data.path && data.name) {
-      rootPath.value = data.path;
-      rootName.value = data.name;
+    if (data && data.length > 0) {
+      workspaceFolders.value = data;
       activePanel.value = 'file'; // 有记录则直接展开侧边栏
     }
   } catch (err) {
@@ -117,16 +116,22 @@ const handleImport = async () => {
     const selected = await open({directory: true, multiple: false});
     if (!selected) return;
 
-    rootPath.value = selected;
-    rootName.value = await basename(selected);
-    activePanel.value = 'file';
+    const name = await basename(selected);
+    const path = selected;
 
-    // 导入成功后，通知后端保存记录
-    await fetch('http://127.0.0.1:8000/file/history', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({path: rootPath.value, name: rootName.value})
-    });
+    // 避免前端重复添加相同的文件夹
+    if (!workspaceFolders.value.find(f => f.path === path)) {
+      workspaceFolders.value.push({path, name});
+
+      // 导入成功后，通知后端保存记录
+      await fetch('http://127.0.0.1:8000/file/history', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path, name})
+      });
+    }
+
+    activePanel.value = 'file';
   } catch (error) {
     console.error('导入失败:', error);
   }

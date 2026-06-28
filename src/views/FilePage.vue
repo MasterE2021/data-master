@@ -1,19 +1,9 @@
 <template>
   <div class="file-page-wrapper">
-    <!-- 1. 顶部：展示根文件名称与路径 -->
-    <div class="project-header">
-      <div class="project-name">
-        <span class="icon">📂</span> {{ rootName }}
-      </div>
-      <!-- 使用 title 属性，鼠标悬浮时可以查看完整路径 -->
-      <div class="project-path" :title="rootPath">
-        {{ rootPath }}
-      </div>
-    </div>
-
-    <!-- 2. 底部：懒加载文件树 -->
     <div class="file-tree-container">
+      <!-- 增加 :key 强制在新增文件夹时重新渲染树级 -->
       <el-tree
+          :key="treeKey"
           :props="defaultProps"
           :load="loadNode"
           lazy
@@ -23,9 +13,15 @@
           class="custom-tree"
       >
         <template #default="{ node, data }">
-          <span class="custom-tree-node">
-            <span class="icon">{{ data.isDir ? '📁' : '📄' }}</span>
+          <!-- 动态绑定 class，用于区分根节点样式 -->
+          <span class="custom-tree-node" :class="{ 'is-root-node': data.isRoot }">
+            <span class="icon">{{ data.isRoot ? '📦' : (data.isDir ? '📁' : '📄') }}</span>
             <span class="label" :title="data.name">{{ data.name }}</span>
+
+            <!-- 如果当前节点是根文件夹，在后方展示浅色的全路径 -->
+            <span v-if="data.isRoot" class="root-path-hint" :title="data.path">
+              - {{ data.path }}
+            </span>
           </span>
         </template>
       </el-tree>
@@ -34,13 +30,12 @@
 </template>
 
 <script setup>
-import {defineProps} from 'vue';
+import {defineProps, ref, watch} from 'vue';
 import {readDir} from '@tauri-apps/plugin-fs';
 import {join} from '@tauri-apps/api/path';
 
 const props = defineProps({
-  rootPath: {type: String, required: true},
-  rootName: {type: String, required: true}
+  workspaceFolders: {type: Array, required: true}
 });
 
 const defaultProps = {
@@ -49,12 +44,29 @@ const defaultProps = {
   isLeaf: 'isLeaf'
 };
 
+const treeKey = ref(0);
+
+// 当外部新增文件夹时，更新 key 以强制 el-tree 重新加载顶级节点
+watch(() => props.workspaceFolders, () => {
+  treeKey.value++;
+}, {deep: true});
+
 const loadNode = async (node, resolve) => {
   try {
-    // 关键改变：当是第一层级 (level === 0) 时，直接读取传进来的根目录内容
-    // 这样树的最外层直接就是子文件和子文件夹
-    const currentPath = node.level === 0 ? props.rootPath : node.data.path;
+    // 1. 如果是第 0 层，直接渲染所有根文件夹（使其可折叠）
+    if (node.level === 0) {
+      const roots = props.workspaceFolders.map(folder => ({
+        name: folder.name,
+        path: folder.path,
+        isDir: true,
+        isLeaf: false,
+        isRoot: true // 标记为根节点
+      }));
+      return resolve(roots);
+    }
 
+    // 2. 如果是子层级，读取该目录下的内容
+    const currentPath = node.data.path;
     const entries = await readDir(currentPath);
     const children = [];
 
@@ -64,7 +76,8 @@ const loadNode = async (node, resolve) => {
         name: entry.name,
         path: fullPath,
         isDir: entry.isDirectory,
-        isLeaf: !entry.isDirectory
+        isLeaf: !entry.isDirectory,
+        isRoot: false
       });
     }
 
@@ -83,7 +96,6 @@ const loadNode = async (node, resolve) => {
 </script>
 
 <style scoped>
-/* 整个文件页面的布局：Flex 列布局 */
 .file-page-wrapper {
   display: flex;
   flex-direction: column;
@@ -92,37 +104,9 @@ const loadNode = async (node, resolve) => {
   overflow: hidden;
 }
 
-/* --- 顶部的项目信息栏样式 --- */
-.project-header {
-  padding: 12px 15px;
-  background-color: #ecf5ff;
-  border-bottom: 1px solid #dcdfe6;
-  flex: 0 0 auto; /* 固定高度不被压缩 */
-}
-
-.project-name {
-  font-size: 14px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-}
-
-.project-path {
-  font-size: 11px;
-  color: #909399;
-  /* 路径太长时自动省略号显示 */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: help; /* 提示用户可以悬浮查看全称 */
-}
-
-/* --- 下方的树形结构样式 --- */
 .file-tree-container {
-  flex: 1; /* 占据剩下的所有空间 */
-  overflow: auto; /* 允许横向和纵向滚动 */
+  flex: 1;
+  overflow: auto;
 }
 
 .custom-tree {
@@ -142,7 +126,23 @@ const loadNode = async (node, resolve) => {
   font-size: 14px;
 }
 
-.label {
+/* 默认 label 样式 */
+.custom-tree-node .label {
+  white-space: nowrap;
+}
+
+/* 根节点专属样式（通过动态 class 控制） */
+.custom-tree-node.is-root-node .label {
+  font-weight: bold;
+  color: #303133;
+}
+
+/* 根路径提示文字样式 */
+.root-path-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+  font-weight: normal;
   white-space: nowrap;
 }
 </style>
