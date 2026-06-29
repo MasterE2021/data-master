@@ -9,6 +9,16 @@ from py import service_file
 from py import service_data
 from py import db_manager
 
+# 修复 PyInstaller --noconsole 模式下 sys.stdout / sys.stderr 为 None 导致 uvicorn 崩溃的问题
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+
 
 class App(FastAPI):
     def __init__(self):
