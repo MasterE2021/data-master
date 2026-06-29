@@ -41,9 +41,6 @@ class App(FastAPI):
         self.db_duckdb = db_manager.DuckDBManager()
         self.db_sqlite = db_manager.SQLiteManager(db_path)
 
-        # 将 sqlite 实例挂载到 app.state 上，方便各个路由模块内部调用
-        self.state.db_sqlite = self.db_sqlite
-
 
 if __name__ == "__main__":
     app = App()
