@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import duckdb
 import os
+import time
 
 router = APIRouter(prefix="/data", tags=["data"])
 
@@ -25,6 +26,8 @@ def preview_data(req: FileRequest):
         return {"error": "暂不支持该文件格式预览"}
 
     try:
+        start_time = time.time()  # 开始计时
+
         con = duckdb.connect()
 
         # 优化：如果总数已经大于0（说明不是第一页），直接跳过耗时的 count 查询
@@ -43,11 +46,14 @@ def preview_data(req: FileRequest):
         # 3. 转为字典列表
         data = [dict(zip(columns, row)) for row in rows]
 
+        cost_time = round(time.time() - start_time, 2)  # 计算耗时保留2位小数
+
         # 返回数据和分页信息
         return {
             "columns": columns,
             "data": data,
-            "total": total_rows
+            "total": total_rows,
+            "cost_time": cost_time
         }
 
     except Exception as e:

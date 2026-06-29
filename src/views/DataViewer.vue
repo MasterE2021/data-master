@@ -7,7 +7,6 @@
 
       <div class="table-header">
         <h3>数据预览: {{ fileName }}</h3>
-        <div class="total-text">总计: {{ total }} 行 (单页 1000 行)</div>
       </div>
 
       <!-- vxe-table 虚拟滚动表格区域 -->
@@ -66,6 +65,8 @@
 <script setup>
 import {ref, watch, computed} from 'vue';
 import {ArrowLeft, ArrowRight, DArrowLeft, DArrowRight} from '@element-plus/icons-vue';
+
+const emit = defineEmits(['update-stats']);
 
 const props = defineProps({
   filePath: {type: String, required: true}
@@ -136,6 +137,12 @@ const fetchData = async () => {
     });
     const result = await res.json();
 
+    emit('update-stats', {
+      loaded: tableData.value.length, // 当前实际渲染的行数
+      total: total.value,             // 总行数
+      time: result.cost_time || 0   // 后端返回的查询耗时
+    });
+
     if (result.error) {
       error.value = result.error;
     } else {
@@ -157,6 +164,8 @@ watch(() => props.filePath, (newPath) => {
   inputPage.value = 1;
   total.value = 0;
   tableData.value = [];
+  fetchData();
+  emit('update-stats', null);
   fetchData();
 }, {immediate: true});
 </script>

@@ -42,7 +42,7 @@
         </div>
 
         <!-- 如果选中了文件，渲染独立的数据组件 -->
-        <DataViewer v-else :file-path="currentFilePath"/>
+        <DataViewer v-else :file-path="currentFilePath" @update-stats="handleUpdateStats"/>
       </el-main>
     </el-container>
 
@@ -50,7 +50,14 @@
     <el-footer height="32px" class="status-bar">
       <div class="status-left">当前面板: {{ activePanel || '已收起' }}</div>
       <div class="status-center">v1.0.0</div>
-      <div class="status-right">状态栏：就绪</div>
+      <div class="status-right">
+        <span v-if="dataStats">
+          展示 {{ dataStats.loaded }} 行, 共 {{ dataStats.total }} 行, 查询耗时 {{ dataStats.time }} 秒
+        </span>
+        <span v-else>
+          状态: 就绪
+        </span>
+      </div>
     </el-footer>
   </el-container>
 </template>
@@ -149,6 +156,12 @@ const handleImport = async () => {
   } catch (error) {
     console.error('导入失败:', error);
   }
+};
+
+const dataStats = ref(null);
+
+const handleUpdateStats = (stats) => {
+  dataStats.value = stats;
 };
 </script>
 
