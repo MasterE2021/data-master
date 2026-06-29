@@ -40,16 +40,16 @@
           <el-button :icon="ArrowLeft" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" title="上一页"/>
 
           <div class="page-display">
-            <!-- 可编辑的页码输入框 -->
+            <!-- 只有一个输入框，宽度动态绑定：最大页数的字符长度 * 1ch -->
             <input
                 v-model="inputPage"
                 class="page-input"
                 type="text"
+                :style="{ width: Math.max(1.5, String(maxPage).length) + 'ch' }"
                 @keyup.enter="handleJump"
                 @blur="handleJump"
                 title="输入页码后回车跳转"
             />
-            <span class="page-total">/ {{ maxPage }}</span>
           </div>
 
           <el-button :icon="ArrowRight" :disabled="currentPage === maxPage || maxPage === 0"
@@ -76,7 +76,7 @@ const tableData = ref([]);
 const loading = ref(false);
 const error = ref('');
 
-// 分页状态 (恢复 1000 行)
+// 分页状态
 const currentPage = ref(1);
 const inputPage = ref(1);
 const pageSize = ref(1000);
@@ -224,38 +224,37 @@ watch(() => props.filePath, (newPath) => {
   align-items: center;
 }
 
+/* ======== 单一输入框容器 ======== */
 .page-display {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  justify-content: center;
+  min-width: 32px; /* 与 Element Plus 默认图标按钮宽度完全一致 */
+  padding: 0 8px; /* 两侧留出呼吸空间 */
   height: 32px;
-  background-color: #f4f4f5;
-  border-top: 1px solid #dcdfe6;
-  border-bottom: 1px solid #dcdfe6;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  border: 1px solid #dcdfe6;
+  margin-left: -1px;
+  margin-right: -1px;
+  z-index: 1;
+  transition: border-color 0.2s;
 }
 
+.page-display:hover, .page-display:focus-within {
+  border-color: #c6e2ff;
+  z-index: 2;
+}
+
+/* 输入框本身 */
 .page-input {
-  width: 40px;
-  height: 24px;
+  /* 只有输入框，居中对齐最美观 */
   text-align: center;
-  font-weight: bold;
+  font-weight: 500;
   color: #409eff;
-  border: 1px solid transparent;
+  border: none;
   background-color: transparent;
   outline: none;
-  border-radius: 4px;
   font-size: 14px;
-  transition: all 0.3s;
-}
-
-.page-input:focus, .page-input:hover {
-  border-color: #c6e2ff;
-  background-color: #ffffff;
-}
-
-.page-total {
-  margin-left: 4px;
-  color: #909399;
-  font-size: 13px;
 }
 </style>
