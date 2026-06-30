@@ -5,9 +5,60 @@
     <div v-else-if="error" class="error-text">读取失败: {{ error }}</div>
     <div v-else class="table-wrapper">
 
-      <div class="table-header">
-        <h3>数据预览: {{ fileName }}</h3>
+      <!-- ================= 新增：顶部操作栏 ================= -->
+      <div class="toolbar">
+        <div class="toolbar-left">
+
+          <!-- 选择列 下拉多选 -->
+          <el-popover placement="bottom-start" width="220" trigger="click">
+            <template #reference>
+              <el-button title="选择需要展示的列">选择列</el-button>
+            </template>
+            <div class="column-selector">
+              <el-checkbox
+                  v-model="checkAll"
+                  :indeterminate="isIndeterminate"
+                  @change="handleCheckAllChange"
+              >全选
+              </el-checkbox>
+              <el-divider style="margin: 8px 0;"/>
+              <el-checkbox-group v-model="selectedColumns" @change="handleColumnChange">
+                <div v-for="col in allColumns" :key="col" class="col-item">
+                  <el-checkbox :label="col" :value="col">{{ col }}</el-checkbox>
+                </div>
+              </el-checkbox-group>
+            </div>
+          </el-popover>
+
+          <!-- 分页器（从底部移到这里，紧挨着选择列按钮） -->
+          <el-button-group class="custom-pager" style="margin-left: 12px;">
+            <el-button :icon="DArrowLeft" :disabled="currentPage === 1" @click="goToPage(1)" title="首页"/>
+            <el-button :icon="ArrowLeft" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)"
+                       title="上一页"/>
+
+            <!-- 自适应宽度的页码输入框 -->
+            <div class="page-display">
+              <input
+                  v-model="inputPage"
+                  class="page-input"
+                  type="text"
+                  :style="{ width: Math.max(1.5, String(maxPage).length) + 'ch' }"
+                  @keyup.enter="handleJump"
+                  @blur="handleJump"
+                  title="输入页码后回车跳转"
+              />
+            </div>
+
+            <el-button :icon="ArrowRight" :disabled="currentPage === maxPage || maxPage === 0"
+                       @click="goToPage(currentPage + 1)" title="下一页"/>
+            <el-button :icon="DArrowRight" :disabled="currentPage === maxPage || maxPage === 0"
+                       @click="goToPage(maxPage)"
+                       title="尾页"/>
+          </el-button-group>
+
+        </div>
       </div>
+      <!-- ================= 顶部操作栏结束 ================= -->
 
       <!-- vxe-table 虚拟滚动表格区域 -->
       <div class="table-body">
@@ -21,9 +72,9 @@
             :loading="loading"
             :scroll-y="{ enabled: true, gt: 100 }"
         >
-          <!-- 动态渲染列 -->
+          <!-- 动态渲染勾选的列 -->
           <vxe-column
-              v-for="col in columns"
+              v-for="col in selectedColumns"
               :key="col"
               :field="col"
               :title="col"
@@ -32,38 +83,12 @@
         </vxe-table>
       </div>
 
-      <!-- 自定义精简分页区域 -->
-      <div class="pagination-wrapper">
-        <el-button-group class="custom-pager">
-          <el-button :icon="DArrowLeft" :disabled="currentPage === 1" @click="goToPage(1)" title="首页"/>
-          <el-button :icon="ArrowLeft" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" title="上一页"/>
-
-          <div class="page-display">
-            <!-- 只有一个输入框，宽度动态绑定：最大页数的字符长度 * 1ch -->
-            <input
-                v-model="inputPage"
-                class="page-input"
-                type="text"
-                :style="{ width: Math.max(1.5, String(maxPage).length) + 'ch' }"
-                @keyup.enter="handleJump"
-                @blur="handleJump"
-                title="输入页码后回车跳转"
-            />
-          </div>
-
-          <el-button :icon="ArrowRight" :disabled="currentPage === maxPage || maxPage === 0"
-                     @click="goToPage(currentPage + 1)" title="下一页"/>
-          <el-button :icon="DArrowRight" :disabled="currentPage === maxPage || maxPage === 0" @click="goToPage(maxPage)"
-                     title="尾页"/>
-        </el-button-group>
-      </div>
-
     </div>
   </div>
 </template>
 
 <script setup>
-import {ref, watch, computed} from 'vue';
+import {ref, watch, computed, nextTick} from 'vue';
 import {ArrowLeft, ArrowRight, DArrowLeft, DArrowRight} from '@element-plus/icons-vue';
 
 const emit = defineEmits(['update-stats']);
@@ -72,7 +97,12 @@ const props = defineProps({
   filePath: {type: String, required: true}
 });
 
-const columns = ref([]);
+// 列选择相关状态
+const allColumns = ref([]);
+const selectedColumns = ref([]);
+const checkAll = ref(true);
+const isIndeterminate = ref(false);
+
 const tableData = ref([]);
 const loading = ref(false);
 const error = ref('');
@@ -83,16 +113,23 @@ const inputPage = ref(1);
 const pageSize = ref(1000);
 const total = ref(0);
 
-const fileName = computed(() => {
-  return props.filePath.split(/[/\\]/).pop();
-});
+const maxPage = computed(() => Math.ceil(total.value / pageSize.value) || 1);
 
-// 计算最大页数
-const maxPage = computed(() => {
-  return Math.ceil(total.value / pageSize.value) || 1;
-});
+// 处理列全选逻辑
+const handleCheckAllChange = (val) => {
+  selectedColumns.value = val ? [...allColumns.value] : [];
+  isIndeterminate.value = false;
+  fetchData();
+};
 
-// 点击按钮跳转
+// 处理单列勾选逻辑
+const handleColumnChange = (value) => {
+  const checkedCount = value.length;
+  checkAll.value = checkedCount === allColumns.value.length;
+  isIndeterminate.value = checkedCount > 0 && checkedCount < allColumns.value.length;
+  fetchData();
+};
+
 const goToPage = (page) => {
   if (page >= 1 && page <= maxPage.value && page !== currentPage.value) {
     currentPage.value = page;
@@ -108,10 +145,8 @@ const handleJump = () => {
     inputPage.value = currentPage.value;
     return;
   }
-
   if (target < 1) target = 1;
   if (target > maxPage.value) target = maxPage.value;
-
   inputPage.value = target;
   if (target !== currentPage.value) {
     currentPage.value = target;
@@ -132,23 +167,32 @@ const fetchData = async () => {
         path: props.filePath,
         page: currentPage.value,
         page_size: pageSize.value,
-        total: total.value
+        total: total.value,
+        columns: selectedColumns.value
       })
     });
     const result = await res.json();
 
-    emit('update-stats', {
-      loaded: tableData.value.length, // 当前实际渲染的行数
-      total: total.value,             // 总行数
-      time: result.cost_time || 0   // 后端返回的查询耗时
-    });
-
     if (result.error) {
       error.value = result.error;
     } else {
-      columns.value = result.columns;
+      // 首次加载初始化所有列
+      if (allColumns.value.length === 0) {
+        allColumns.value = result.columns;
+        selectedColumns.value = result.columns;
+      }
+
       tableData.value = result.data;
       total.value = result.total;
+
+      // 让外层更新状态栏，注意需要用 setTimeout/nextTick 等待 DOM 渲染后统计展示行
+      nextTick(() => {
+        emit('update-stats', {
+          loaded: tableData.value.length,
+          total: total.value,
+          time: result.cost_time || 0
+        });
+      });
     }
   } catch (err) {
     error.value = '网络请求异常: ' + err.message;
@@ -164,7 +208,12 @@ watch(() => props.filePath, (newPath) => {
   inputPage.value = 1;
   total.value = 0;
   tableData.value = [];
-  fetchData();
+  allColumns.value = [];
+  selectedColumns.value = [];
+  checkAll.value = true;
+  isIndeterminate.value = false;
+
+  // 发送 null 给父组件，让右下角立刻变回“状态: 就绪”
   emit('update-stats', null);
   fetchData();
 }, {immediate: true});
@@ -196,23 +245,18 @@ watch(() => props.filePath, (newPath) => {
   overflow: hidden;
 }
 
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+/* ======== 新增 Toolbar ======== */
+.toolbar {
   flex: 0 0 auto;
+  padding-bottom: 12px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
 }
 
-.table-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #303133;
-}
-
-.total-text {
-  font-size: 13px;
-  color: #606266;
+.toolbar-left {
+  display: flex;
+  align-items: center;
 }
 
 .table-body {
@@ -220,26 +264,28 @@ watch(() => props.filePath, (newPath) => {
   overflow: hidden;
 }
 
-.pagination-wrapper {
-  flex: 0 0 auto;
-  padding-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
+/* ======== 下拉列选择框样式 ======== */
+.column-selector {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
+.col-item {
+  margin-bottom: 4px;
+}
+
+/* ======== 分页样式 ======== */
 .custom-pager {
   display: flex;
   align-items: center;
 }
 
-/* ======== 单一输入框容器 ======== */
 .page-display {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px; /* 与 Element Plus 默认图标按钮宽度完全一致 */
-  padding: 0 8px; /* 两侧留出呼吸空间 */
+  min-width: 32px;
+  padding: 0 8px;
   height: 32px;
   box-sizing: border-box;
   background-color: #ffffff;
@@ -255,9 +301,7 @@ watch(() => props.filePath, (newPath) => {
   z-index: 2;
 }
 
-/* 输入框本身 */
 .page-input {
-  /* 只有输入框，居中对齐最美观 */
   text-align: center;
   font-weight: 500;
   color: #409eff;
