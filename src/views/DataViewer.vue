@@ -71,6 +71,7 @@
             :data="tableData"
             :loading="loading"
             :scroll-y="{ enabled: true, gt: 100 }"
+            :column-config="{ resizable: true }"
         >
           <!-- 动态渲染勾选的列 -->
           <vxe-column
