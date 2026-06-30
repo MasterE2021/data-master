@@ -45,7 +45,7 @@ def preview_data(req: FileRequest):
             select_cols = ", ".join([f'"{col}"' for col in req.columns])
 
         offset = (page - 1) * page_size
-        sql = f"SELECT {select_cols} FROM {path} LIMIT {req.page_size} OFFSET {offset}"
+        sql = f"SELECT {select_cols} FROM '{path}' LIMIT {req.page_size} OFFSET {offset}"
 
         result = con.execute(sql)
         columns = [desc[0] for desc in result.description]
