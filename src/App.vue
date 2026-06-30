@@ -186,6 +186,8 @@ html, body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border-top: 1px solid #dcdfe6;
+  box-sizing: border-box;
 }
 
 .main-body {
