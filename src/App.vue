@@ -2,14 +2,17 @@
 <template>
   <el-container class="layout-container">
     <el-container class="main-body">
-      <!-- 1. 左侧工具栏 -->
+      <!-- 1. 左侧工具栏（不变） -->
       <el-aside width="40px" class="toolbar-aside">
         <div class="toolbar">
           <div class="toolbar-top">
             <el-button type="primary" :icon="FolderOpened" class="tool-btn"
                        :class="{ 'is-active': activePanel === 'file' }" @click="togglePanel('file')"/>
-            <el-button type="warning" :icon="List" class="tool-btn" :class="{ 'is-active': activePanel === 'todo' }"
-                       @click="togglePanel('todo')"/>
+            <el-button type="warning" :icon="List" class="tool-btn"
+                       :class="{ 'is-active': activePanel === 'todo' }" @click="togglePanel('todo')"/>
+            <!-- Demo 按钮已存在，图标保持为 Menu -->
+            <el-button type="default" :icon="Menu" class="tool-btn"
+                       :class="{ 'is-active': activePanel === 'demo' }" @click="togglePanel('demo')"/>
           </div>
           <div class="toolbar-spacer"></div>
           <div class="toolbar-bottom">
@@ -19,8 +22,8 @@
         </div>
       </el-aside>
 
-      <!-- 2. 动态侧边栏 -->
-      <el-aside v-show="activePanel" :width="panelWidth + 'px'" class="side-panel">
+      <!-- 2. 动态侧边栏 —— demo 时不显示 -->
+      <el-aside v-show="activePanel && activePanel !== 'demo'" :width="panelWidth + 'px'" class="side-panel">
         <div class="panel-inner">
           <div v-show="activePanel === 'file'" class="panel-content">
             <div v-if="workspaceFolders.length === 0" class="empty-text">暂无数据，请点击左下角导入文件夹</div>
@@ -30,18 +33,22 @@
           <div v-show="activePanel === 'todo'" class="panel-content">
             <TodoPage/>
           </div>
+          <!-- 移除原 demo 面板，不再占用侧边栏 -->
         </div>
         <div class="resizer" @mousedown="startResize"></div>
       </el-aside>
 
       <!-- 3. 主工作区 -->
       <el-main class="main-content">
-        <!-- 如果没有选中文件，显示提示 -->
-        <div v-if="!currentFilePath" class="welcome-text">
+        <!-- demo 激活时：直接展示 DemoPage -->
+        <DemoPage v-if="activePanel === 'demo'"/>
+
+        <!-- 非 demo 且无文件选中：欢迎引导 -->
+        <div v-else-if="!currentFilePath" class="welcome-text">
           请在左侧点击 CSV/Parquet/Excel 文件进行预览
         </div>
 
-        <!-- 如果选中了文件，渲染独立的数据组件 -->
+        <!-- 非 demo 且已选中文件：展示数据组件 -->
         <DataViewer v-else :file-path="currentFilePath" @update-stats="handleUpdateStats"/>
       </el-main>
     </el-container>
@@ -54,9 +61,7 @@
         <span v-if="dataStats">
           展示 {{ dataStats.loaded }} 行, 共 {{ dataStats.total }} 行, 查询耗时 {{ dataStats.time }} 秒
         </span>
-        <span v-else>
-          状态: 就绪
-        </span>
+        <span v-else>状态: 就绪</span>
       </div>
     </el-footer>
   </el-container>
@@ -70,6 +75,7 @@ import TodoPage from './views/TodoPage.vue';
 import DataViewer from './views/DataViewer.vue';
 import {open} from '@tauri-apps/plugin-dialog';
 import {basename} from '@tauri-apps/api/path';
+import DemoPage from "./views/DemoPage.vue";
 
 const currentFilePath = ref('');
 const activePanel = ref('');
