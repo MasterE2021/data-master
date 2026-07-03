@@ -10,9 +10,10 @@
                        :class="{ 'is-active': activePanel === 'file' }" @click="togglePanel('file')"/>
             <el-button type="warning" :icon="List" class="tool-btn"
                        :class="{ 'is-active': activePanel === 'todo' }" @click="togglePanel('todo')"/>
-            <!-- Demo 按钮已存在，图标保持为 Menu -->
             <el-button type="default" :icon="Menu" class="tool-btn"
                        :class="{ 'is-active': activePanel === 'demo' }" @click="togglePanel('demo')"/>
+            <el-button type="default" :icon="Menu" class="tool-btn"
+                       :class="{ 'is-active': activePanel === 'virtualTable' }" @click="togglePanel('virtualTable')"/>
           </div>
           <div class="toolbar-spacer"></div>
           <div class="toolbar-bottom">
@@ -23,7 +24,8 @@
       </el-aside>
 
       <!-- 2. 动态侧边栏 —— demo 时不显示 -->
-      <el-aside v-show="activePanel && activePanel !== 'demo'" :width="panelWidth + 'px'" class="side-panel">
+      <el-aside v-show="activePanel && activePanel !== 'virtualTable' && activePanel !== 'demo'"
+                :width="panelWidth + 'px'" class="side-panel">
         <div class="panel-inner">
           <div v-show="activePanel === 'file'" class="panel-content">
             <div v-if="workspaceFolders.length === 0" class="empty-text">暂无数据，请点击左下角导入文件夹</div>
@@ -42,6 +44,9 @@
       <el-main class="main-content">
         <!-- demo 激活时：直接展示 DemoPage -->
         <DemoPage v-if="activePanel === 'demo'"/>
+
+        <!-- virtualTable 激活时：直接展示 DemoPage -->
+        <VirtualScrollerTable v-if="activePanel === 'virtualTable'"/>
 
         <!-- 非 demo 且无文件选中：欢迎引导 -->
         <div v-else-if="!currentFilePath" class="welcome-text">
@@ -76,6 +81,7 @@ import DataViewer from './views/DataViewer.vue';
 import {open} from '@tauri-apps/plugin-dialog';
 import {basename} from '@tauri-apps/api/path';
 import DemoPage from "./views/DemoPage.vue";
+import VirtualScrollerTable from "./views/VirtualScrollerTable.vue";
 
 const currentFilePath = ref('');
 const activePanel = ref('');
