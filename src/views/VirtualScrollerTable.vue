@@ -201,6 +201,7 @@ const viewportH = ref(560)           // 数据区可视高度
 
 // ---- 编辑相关 ----
 const editMode = ref(false)          // 是否处于编辑模式
+const columnSelect = ref(true)       // 是否展开列选择窗口
 const pendingEdits = ref({})         // 未提交的修改: { "rowIndex:colKey": newValue }
 const editingCell = ref(null)        // 正在编辑的单元格 { row, key }
 const editingValue = ref('')         // 编辑框绑定值
@@ -806,179 +807,189 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="vst-root">
-    <!-- ==================== 工具栏 ==================== -->
-    <div class="vst-toolbar">
-      <template v-if="!editMode">
-        <button class="btn primary" @click="enterEditMode">编辑</button>
-      </template>
-      <template v-else>
-        <button class="btn success" @click="applyEdits">
-          应用 ({{ editedCount }})
-        </button>
-        <button class="btn" @click="exitEditMode">退出编辑</button>
-        <span class="hint">单击 cell 编辑, 按住左键拖拽可框选批量修改</span>
-      </template>
 
-      <span class="spacer"></span>
-
-      <div class="col-panel-wrap">
-        <button class="btn" @click="showColumnPanel = !showColumnPanel">
-          列设置 ▾
-        </button>
-        <!-- 列显隐勾选面板 -->
-        <div v-if="showColumnPanel" class="col-panel">
-          <label v-for="key in columnOrder" :key="key" class="col-panel-item">
-            <input
-                type="checkbox"
-                :checked="!hiddenList.includes(key)"
-                @change="toggleColumn(key)"
-            />
-            {{ columnMap[key]?.title }}
-          </label>
-        </div>
+    <!-- 左侧空间-->
+    <div class="left-space">
+      <!-- 列显隐勾选面板 -->
+      <div v-if="showColumnPanel" class="column-panel">
+        <label v-for="key in columnOrder" :key="key" class="col-panel-item">
+          <input
+              type="checkbox"
+              :checked="!hiddenList.includes(key)"
+              @change="toggleColumn(key)"
+          />
+          {{ columnMap[key]?.title }}
+        </label>
       </div>
-      <button class="btn" @click="resetConfig">重置列配置</button>
-
-      <span class="status">
-        已加载 {{ rows.length }} 行{{ hasMore ? '' : ' (已全部加载)' }}
-      </span>
     </div>
 
-    <!-- ==================== 表格主体 (grid 四象限布局) ====================
-         ┌────────┬──────────────┐
-         │ 角落#  │  表头(横向同步) │
-         ├────────┼──────────────┤
-         │ 行号列  │  数据区(滚动源) │
-         │(纵向同步)│              │
-         └────────┴──────────────┘
-         表头/行号列用 overflow:hidden + transform 与数据区滚动位置同步,
-         从而实现"表头吸顶 + 行号列固定"。
-    -->
-    <div class="vst-wrapper">
-      <!-- 左上角: 行号列表头 -->
-      <div class="vst-corner">#</div>
+    <div class="mian-space">
+      <!-- ==================== 工具栏 ==================== -->
+      <div class="vst-toolbar">
 
-      <!-- 表头视口: 只随横向滚动 -->
-      <div class="vst-header-viewport">
-        <div
-            class="vst-header-inner"
-            :style="{
+        <div class="col-panel-wrap">
+          <button class="btn" @click="showColumnPanel = !showColumnPanel">
+            << 列选择
+          </button>
+        </div>
+
+        <button class="btn" @click="resetConfig">重置列配置</button>
+
+        <span class="spacer"></span>
+
+        <template v-if="!editMode">
+          <button class="btn primary" @click="enterEditMode">编辑</button>
+        </template>
+        <template v-else>
+          <button class="btn success" @click="applyEdits">
+            应用 ({{ editedCount }})
+          </button>
+          <button class="btn" @click="exitEditMode">退出编辑</button>
+          <span class="hint">单击 cell 编辑, 按住左键拖拽可框选批量修改</span>
+        </template>
+
+        <span class="status">
+        已加载 {{ rows.length }} 行{{ hasMore ? '' : ' (已全部加载)' }}
+      </span>
+      </div>
+
+      <!-- ==================== 表格主体 (grid 四象限布局) ====================
+           ┌────────┬──────────────┐
+           │ 角落#  │  表头(横向同步) │
+           ├────────┼──────────────┤
+           │ 行号列  │  数据区(滚动源) │
+           │(纵向同步)│              │
+           └────────┴──────────────┘
+           表头/行号列用 overflow:hidden + transform 与数据区滚动位置同步,
+           从而实现"表头吸顶 + 行号列固定"。
+      -->
+      <div class="vst-wrapper">
+        <!-- 左上角: 行号列表头 -->
+        <div class="vst-corner">#</div>
+
+        <!-- 表头视口: 只随横向滚动 -->
+        <div class="vst-header-viewport">
+          <div
+              class="vst-header-inner"
+              :style="{
             width: totalWidth + 'px',
             transform: `translateX(${-scrollLeft}px)`,
           }"
-        >
-          <!-- 仅渲染可视范围内的表头单元格 -->
-          <div
-              v-for="col in visibleCols"
-              :key="col.key"
-              class="vst-header-cell"
-              :class="{
+          >
+            <!-- 仅渲染可视范围内的表头单元格 -->
+            <div
+                v-for="col in visibleCols"
+                :key="col.key"
+                class="vst-header-cell"
+                :class="{
               'drag-source': headerDrag.dragging && headerDrag.pendingKey === col.key,
               'drop-before':
                 headerDrag.dragging && headerDrag.dropIndex === col.orderIndex && !headerDrag.dropAfter,
               'drop-after':
                 headerDrag.dragging && headerDrag.dropIndex === col.orderIndex && headerDrag.dropAfter,
             }"
-              :style="{ left: col.left + 'px', width: col.width + 'px' }"
-              @mousedown="onHeaderMouseDown(col, $event)"
-          >
-            <span class="header-title">{{ col.title }}</span>
-            <!-- 左边缘拖拽柄: 调整前一列宽度 -->
-            <div
-                v-if="col.orderIndex > 0"
-                class="resize-handle left"
-                @mousedown.stop.prevent="onResizeStart(displayColumns[col.orderIndex - 1].key, $event)"
-            ></div>
-            <!-- 右边缘拖拽柄: 调整本列宽度 -->
-            <div
-                class="resize-handle right"
-                @mousedown.stop.prevent="onResizeStart(col.key, $event)"
-            ></div>
+                :style="{ left: col.left + 'px', width: col.width + 'px' }"
+                @mousedown="onHeaderMouseDown(col, $event)"
+            >
+              <span class="header-title">{{ col.title }}</span>
+              <!-- 左边缘拖拽柄: 调整前一列宽度 -->
+              <div
+                  v-if="col.orderIndex > 0"
+                  class="resize-handle left"
+                  @mousedown.stop.prevent="onResizeStart(displayColumns[col.orderIndex - 1].key, $event)"
+              ></div>
+              <!-- 右边缘拖拽柄: 调整本列宽度 -->
+              <div
+                  class="resize-handle right"
+                  @mousedown.stop.prevent="onResizeStart(col.key, $event)"
+              ></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- 行号列视口: 只随纵向滚动。行号为前端生成, 用于锚定数据行, 不可编辑 -->
-      <div class="vst-rownum-viewport">
-        <div
-            class="vst-rownum-inner"
-            :style="{
+        <!-- 行号列视口: 只随纵向滚动。行号为前端生成, 用于锚定数据行, 不可编辑 -->
+        <div class="vst-rownum-viewport">
+          <div
+              class="vst-rownum-inner"
+              :style="{
             height: totalHeight + 'px',
             transform: `translateY(${-scrollTop}px)`,
           }"
+          >
+            <div
+                v-for="ri in visibleRowIndexes"
+                :key="ri"
+                class="vst-rownum-cell"
+                :class="rowColorClass(ri + 1)"
+                :style="{ top: ri * ROW_HEIGHT + 'px', height: ROW_HEIGHT + 'px' }"
+            >
+              {{ ri + 1 }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据区: 唯一的滚动源 -->
+        <div
+            ref="bodyRef"
+            class="vst-body-viewport"
+            @scroll="onScroll"
+            @wheel="onWheel"
         >
+          <!-- 占位元素: 撑出与全部已加载内容等大的滚动区域(总宽×总高)。
+               列少时 totalWidth < 视口宽 → 右侧留白, 不拉伸列 -->
+          <div
+              class="vst-phantom"
+              :style="{ width: totalWidth + 'px', height: totalHeight + 'px' }"
+          ></div>
+
+          <!-- 仅渲染可视行; 每行内部仅渲染可视列 → 双向虚拟化 -->
           <div
               v-for="ri in visibleRowIndexes"
               :key="ri"
-              class="vst-rownum-cell"
+              class="vst-row"
               :class="rowColorClass(ri + 1)"
-              :style="{ top: ri * ROW_HEIGHT + 'px', height: ROW_HEIGHT + 'px' }"
-          >
-            {{ ri + 1 }}
-          </div>
-        </div>
-      </div>
-
-      <!-- 数据区: 唯一的滚动源 -->
-      <div
-          ref="bodyRef"
-          class="vst-body-viewport"
-          @scroll="onScroll"
-          @wheel="onWheel"
-      >
-        <!-- 占位元素: 撑出与全部已加载内容等大的滚动区域(总宽×总高)。
-             列少时 totalWidth < 视口宽 → 右侧留白, 不拉伸列 -->
-        <div
-            class="vst-phantom"
-            :style="{ width: totalWidth + 'px', height: totalHeight + 'px' }"
-        ></div>
-
-        <!-- 仅渲染可视行; 每行内部仅渲染可视列 → 双向虚拟化 -->
-        <div
-            v-for="ri in visibleRowIndexes"
-            :key="ri"
-            class="vst-row"
-            :class="rowColorClass(ri + 1)"
-            :style="{
+              :style="{
             top: ri * ROW_HEIGHT + 'px',
             height: ROW_HEIGHT + 'px',
             width: totalWidth + 'px',
           }"
-        >
-          <div
-              v-for="col in visibleCols"
-              :key="col.key"
-              class="vst-cell"
-              :class="{
+          >
+            <div
+                v-for="col in visibleCols"
+                :key="col.key"
+                class="vst-cell"
+                :class="{
               selected: isSelected(ri, col.orderIndex),
               edited: isEdited(ri, col.key),
               editing: isEditingCell(ri, col.key),
               editable: editMode,
             }"
-              :style="{ left: col.left + 'px', width: col.width + 'px' }"
-              @mousedown="onCellMouseDown($event, ri, col)"
-              @dblclick="onCellDblClick(ri, col)"
-              @mouseenter="onCellEnter($event, ri, col)"
-              @mouseleave="onCellLeave"
-          >
-            <!-- 编辑态: 内嵌输入框 -->
-            <input
-                v-if="isEditingCell(ri, col.key)"
-                :ref="setEditInputRef"
-                v-model="editingValue"
-                class="cell-input"
-                @keydown.enter="commitEdit"
-                @keydown.esc="cancelEdit"
-                @blur="commitEdit"
-            />
-            <!-- 展示态: 超出宽度自动省略号 -->
-            <span v-else class="cell-text">{{ getCellValue(ri, col.key) }}</span>
+                :style="{ left: col.left + 'px', width: col.width + 'px' }"
+                @mousedown="onCellMouseDown($event, ri, col)"
+                @dblclick="onCellDblClick(ri, col)"
+                @mouseenter="onCellEnter($event, ri, col)"
+                @mouseleave="onCellLeave"
+            >
+              <!-- 编辑态: 内嵌输入框 -->
+              <input
+                  v-if="isEditingCell(ri, col.key)"
+                  :ref="setEditInputRef"
+                  v-model="editingValue"
+                  class="cell-input"
+                  @keydown.enter="commitEdit"
+                  @keydown.esc="cancelEdit"
+                  @blur="commitEdit"
+              />
+              <!-- 展示态: 超出宽度自动省略号 -->
+              <span v-else class="cell-text">{{ getCellValue(ri, col.key) }}</span>
+            </div>
           </div>
         </div>
+
+        <!-- 触底加载提示 -->
+        <div v-if="loadingRows" class="vst-loading">加载中…</div>
       </div>
 
-      <!-- 触底加载提示 -->
-      <div v-if="loadingRows" class="vst-loading">加载中…</div>
     </div>
 
     <!-- ==================== 全局浮层 ==================== -->
@@ -1026,9 +1037,15 @@ onBeforeUnmount(() => {
 <style scoped>
 /* ======================= 整体 ======================= */
 .vst-root {
+  display: flex;
   font-size: 13px;
   color: #333;
   font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+.mian-space {
+  display: flex;
+  flex-direction: column;
 }
 
 /* ======================= 工具栏 ======================= */
@@ -1083,8 +1100,7 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
-.col-panel {
-  position: absolute;
+.column-panel {
   top: 32px;
   right: 0;
   z-index: 100;
@@ -1116,7 +1132,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 60px 1fr; /* 60px = ROWNUM_WIDTH */
   grid-template-rows: 40px 1fr; /* 40px = 表头高度 */
-  height: 600px;
+  height: 1000px;
   border: 1px solid #dcdfe6;
   background: #fff;
   overflow: hidden;
