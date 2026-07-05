@@ -4,6 +4,9 @@ import {ref, onMounted, onBeforeUnmount, onUnmounted} from 'vue';
 import Signal from './utils/SignalCenter.js'
 import {SignalName} from './utils/Common.js'
 import FilePage from "./views/FilePage.vue";
+import DataViewer from "./views/DataViewer.vue";
+import Logger from "./utils/Logger.js";
+import {toJSONString} from "xe-utils";
 
 /*
 ref	            单一值、需要整体替换对象、在模板中需自动解包时。
@@ -17,8 +20,9 @@ nextTick	      当你改变数据后需要立刻读取新的 DOM 状态，或者
 
 // ========== 组件状态 ==========
 const is_open_list_space = ref(false)
-const file_folder = ref([]);
-
+const file_tree = ref([]);
+const is_welcome = ref(true);
+const current_data_file_path = ref('');
 
 // ========== 拖拽调整宽度 ==========
 const list_space_width = ref(250)        // 初始宽度
@@ -64,11 +68,19 @@ function btn_file() {
 onMounted(async () => {
   try {
     const res = await fetch('http://127.0.0.1:8000/file/history/all'); // 调用新接口
-    file_folder.value = await res.json();
+    const file_tree_json = await res.json();
+    Logger.info("读取到文件树:" + toJSONString(file_tree_json))
+    file_tree.value = file_tree_json;
   } catch (err) {
     console.error('获取历史导入记录失败:', err);
   }
 });
+
+// 文件点击事件
+const click_file_event = (path) => {
+  is_welcome.value = false;
+  current_data_file_path.value = path;
+};
 
 </script>
 
@@ -83,14 +95,17 @@ onMounted(async () => {
 
       <div class="list-space" v-if="is_open_list_space" :style="{ width: list_space_width + 'px' }">
         <div class="file-tree">
-          <FilePage :workspace-folders="file_folder"/>
+          <FilePage :workspace-folders="file_tree" @file-click="click_file_event"/>
         </div>
       </div>
 
       <div class="space-line" v-if="is_open_list_space" @mousedown="startResize"></div>
 
       <div class="core-space">
-        工作空间
+        <div class="welcome-page" v-if="is_welcome">
+          欢迎使用 data-master, 这是首页
+        </div>
+        <DataViewer v-else :file-path="current_data_file_path"/>
       </div>
 
     </div>
