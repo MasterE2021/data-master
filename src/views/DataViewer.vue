@@ -91,6 +91,8 @@
 <script setup>
 import {ref, watch, computed, nextTick} from 'vue';
 import {ArrowLeft, ArrowRight, DArrowLeft, DArrowRight} from '@element-plus/icons-vue';
+import Logger from "../utils/Logger.js";
+import {toJSONString} from "xe-utils";
 
 const emit = defineEmits(['update-stats']);
 
@@ -161,7 +163,7 @@ const fetchData = async () => {
   error.value = '';
 
   try {
-    const res = await fetch('http://127.0.0.1:8000/data/preview', {
+    const body = {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -171,8 +173,10 @@ const fetchData = async () => {
         total: total.value,
         columns: selectedColumns.value
       })
-    });
+    }
+    const res = await fetch('http://127.0.0.1:8000/data/preview', body);
     const result = await res.json();
+    Logger.info("读取到数据" + toJSONString(result))
 
     if (result.error) {
       error.value = result.error;

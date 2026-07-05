@@ -5,6 +5,7 @@ import Signal from './utils/SignalCenter.js'
 import {SignalName} from './utils/Common.js'
 import FilePage from "./views/FilePage.vue";
 import DataViewer from "./views/DataViewer.vue";
+import Array from "./views/edit/Array.vue";
 import Logger from "./utils/Logger.js";
 import {toJSONString} from "xe-utils";
 
@@ -78,6 +79,7 @@ onMounted(async () => {
 
 // 文件点击事件
 const click_file_event = (path) => {
+  Logger.info("获取到文件路径" + path)
   is_welcome.value = false;
   current_data_file_path.value = path;
 };
@@ -105,7 +107,7 @@ const click_file_event = (path) => {
         <div class="welcome-page" v-if="is_welcome">
           欢迎使用 data-master, 这是首页
         </div>
-        <DataViewer v-else :file-path="current_data_file_path"/>
+        <Array v-else :file-path="current_data_file_path"/>
       </div>
 
     </div>
