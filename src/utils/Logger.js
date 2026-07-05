@@ -77,12 +77,7 @@ class LoggerSystem {
         const browserStyle = `color: ${levelObj.color}; font-weight: bold;`;
         console.log(`%c[${timestamp}] [${levelObj.label}]`, browserStyle, ...args);
 
-        // 2. 与信号中心配合
-        Signal.emit(SignalName.SYSTEM_LOG, {
-            level: levelObj.label.trim(), timestamp: timestamp, message: strMessage, rawData: args
-        });
-
-        // 3. Tauri 双端打印：发送给 Rust 后端终端
+        // 2. Tauri 双端打印：发送给 Rust 后端终端
         if (window.__TAURI_INTERNALS__) {
             invoke('backend_log', {
                 level: levelObj.label.trim(), timestamp: timestamp, message: strMessage
