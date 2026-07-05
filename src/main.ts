@@ -3,11 +3,11 @@
 import {createApp} from "vue";
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
-import App from './App.vue'
+import Home from './Home.vue'
 import VXETable from 'vxe-table'
 import 'vxe-table/lib/style.css'
 
-const app = createApp(App)
+const app = createApp(Home)
 
 app.use(ElementPlus)
 app.use(VXETable)
