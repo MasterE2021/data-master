@@ -19,6 +19,41 @@ nextTick	      当你改变数据后需要立刻读取新的 DOM 状态，或者
 const is_open_list_space = ref(false)
 const file_folder = ref([]);
 
+
+// ========== 拖拽调整宽度 ==========
+const list_space_width = ref(250)        // 初始宽度
+const is_resizing = ref(false)
+const start_x = ref(0)
+const initial_width = ref(0)
+
+function startResize(e) {
+  is_resizing.value = true
+  start_x.value = e.clientX
+  initial_width.value = list_space_width.value
+  e.preventDefault()
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
+
+function onMouseMove(e) {
+  if (!is_resizing.value) return
+  const dx = e.clientX - start_x.value
+  let newWidth = initial_width.value + dx
+  if (newWidth < 100) newWidth = 100   // 最小宽度限制
+  list_space_width.value = newWidth
+}
+
+function onMouseUp() {
+  is_resizing.value = false
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mouseup', onMouseUp)
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mouseup', onMouseUp)
+})
+
 // ========== 信号系统 ==========
 function btn_file() {
   is_open_list_space.value = !is_open_list_space.value
@@ -46,11 +81,13 @@ onMounted(async () => {
         <button class="btn-2">按钮</button>
       </div>
 
-      <div class="list-space" v-if="is_open_list_space">
+      <div class="list-space" v-if="is_open_list_space" :style="{ width: list_space_width + 'px' }">
         <div class="file-tree">
           <FilePage :workspace-folders="file_folder"/>
         </div>
       </div>
+
+      <div class="space-line" v-if="is_open_list_space" @mousedown="startResize"></div>
 
       <div class="core-space">
         工作空间
@@ -119,6 +156,26 @@ html, body {
   background: #b6b8bf;
 }
 
+.space-line {
+  width: 6px;
+  position: relative;
+  cursor: col-resize;
+  user-select: none;
+}
+
+.space-line::after {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 100%;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+
+.space-line:hover, .space-line:active {
+  background-color: #409eff;
+}
+
 .core-space {
   flex: 1;
   text-align: center;
@@ -137,5 +194,4 @@ html, body {
   display: flex;
   flex-direction: column;
 }
-
 </style>
